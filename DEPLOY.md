@@ -6,17 +6,15 @@ gosee 采用 **Go embed** 把前端打进后端二进制，部署只需一个可
 
 ## 一、构建产物
 
-### 1. 构建前端
+项目根目录一键构建（推荐）：
 ```bash
-cd web
-pnpm install
-pnpm build          # 生成 web/dist
+make all    # = pnpm build + go build，生成单二进制 gosee（~40M，含前端 + 后端）
 ```
 
-### 2. 构建后端（自动 embed 前端 dist）
+或手动分步：
 ```bash
-cd ..
-go build -o gosee ./cmd/server    # 单二进制 ~40M，含前端 + 后端
+cd web && pnpm install && pnpm build   # 前端 → web/dist
+cd .. && go build -o gosee ./cmd/server # 后端（自动 embed 前端）
 ```
 
 > 顺序很重要：必须先 `pnpm build` 生成 `web/dist`，再 `go build`（否则 embed 报错）。
