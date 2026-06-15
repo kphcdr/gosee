@@ -1,0 +1,36 @@
+# 二进制
+gosee
+bin/
+*.exe
+
+# SQLite 数据文件
+*.db
+*.db-*
+
+# Go
+vendor/
+
+# 日志
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 环境 / 本地配置
+.env
+.env.local
+configs/config.local.yaml
+
+# OS
+.DS_Store
+
+# Claude 工作目录（含 memory/plans，不提交）
+.claude/
+
+# 前端依赖与构建产物（web/.gitignore 已含，根目录保险）
+web/node_modules/
+web/dist/

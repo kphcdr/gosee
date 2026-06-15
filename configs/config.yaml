@@ -1,0 +1,44 @@
+# gosee 配置文件
+app:
+  name: gosee
+  env: dev           # dev | prod
+  port: 8080
+
+database:
+  # sqlite：免 CGO，本地开发直接用文件
+  # mysql：切换后改 dsn 为标准 MySQL DSN 即可，代码无需改动
+  driver: sqlite     # sqlite | mysql
+  dsn: "gosee.db"    # sqlite 为文件路径；mysql 例: root:pass@tcp(127.0.0.1:3306)/gosee?charset=utf8mb4&parseTime=True&loc=Local
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+
+jwt:
+  secret: "change-me-in-production"
+  issuer: "gosee"
+  expire_hours: 24
+
+# 首次启动若数据库无管理员，自动创建该账号
+admin:
+  username: "admin"
+  password: "admin123"
+
+security:
+  # AES-256-GCM 密钥，必须是 64 位十六进制字符串（解码后 32 字节）
+  # 生产环境务必替换！
+  encryption_key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+log:
+  level: info        # debug | info | warn | error
+  dir: "logs"
+
+collector:
+  interval: "10m"            # cron @every 间隔，每 10 分钟采集一次
+  worker_count: 10           # 并发采集 worker 数（10台以内建议5，10-100台建议20）
+  ssh_connect_timeout: "5s"  # SSH 连接超时
+  ssh_command_timeout: "15s" # 采集脚本执行超时
+  max_retries: 1             # 单台失败重试次数

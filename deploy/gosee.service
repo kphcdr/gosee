@@ -1,0 +1,25 @@
+[Unit]
+Description=gosee server monitor
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gosee
+Group=gosee
+WorkingDirectory=/opt/gosee
+Environment=GOSEE_CONFIG=/opt/gosee/config.yaml
+ExecStart=/opt/gosee/gosee
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+# 安全加固：限制权限
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/gosee
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

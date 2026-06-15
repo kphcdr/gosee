@@ -1,0 +1,50 @@
+# gosee 生产配置示例
+# 拷贝为 config.yaml 后，务必替换所有 CHANGE_ME 项！
+#
+# 生成强随机密钥：
+#   openssl rand -hex 32
+
+app:
+  name: gosee
+  env: prod            # prod 模式，gin 释放模式
+  port: 8080
+
+database:
+  # sqlite：单机部署直接用文件，零依赖
+  # mysql：大规模(>50台)或需要并发写入时切换，改 dsn 为标准 MySQL DSN
+  driver: sqlite
+  dsn: "gosee.db"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+
+jwt:
+  secret: "CHANGE_ME_RUN_openssl_rand_hex_32"   # ★必改★ openssl rand -hex 32
+  issuer: "gosee"
+  expire_hours: 24
+
+# 首次启动若数据库无管理员，自动创建该账号
+admin:
+  username: "admin"
+  password: "CHANGE_ME_STRONG_PASSWORD"          # ★必改★ 启动后建议在前端再改一次
+
+security:
+  # AES-256-GCM 密钥，必须是 64 位十六进制（解码后 32 字节）
+  # ★必改★ openssl rand -hex 32
+  # 若不改，等于 SSH 私钥/密码明文存储！
+  encryption_key: "CHANGE_ME_64_HEX_CHARS_000000000000000000000000000000000000000000000000"
+
+log:
+  level: info         # debug | info | warn | error
+  dir: "logs"
+
+collector:
+  interval: "10m"            # cron @every 间隔
+  worker_count: 10           # 并发采集 worker 数
+  ssh_connect_timeout: "5s"
+  ssh_command_timeout: "15s"
+  max_retries: 1
