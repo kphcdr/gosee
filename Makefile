@@ -13,6 +13,11 @@ frontend:
 backend:
 	go build -o gosee ./cmd/server
 
+# 交叉编译 Linux amd64 单二进制（在 mac 上构建，部署到 Linux 服务器）
+# glebarez/sqlite 纯 Go 免 CGO，无需 C 工具链
+build-linux: frontend
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o gosee-linux-amd64 ./cmd/server
+
 # ===== 开发 =====
 
 # 运行后端（go run，读 configs/config.yaml）
@@ -68,4 +73,5 @@ help:
 	@echo "  make check      前后端全量检查（typecheck + vet）"
 	@echo "  make clean      清理构建产物"
 	@echo "  make tidy       go mod tidy"
+	@echo "  make build-linux 交叉编译 Linux amd64 单二进制（部署到 Linux 服务器）"
 	@echo "  make deploy     构建部署产物"

@@ -11,6 +11,14 @@ gosee 采用 **Go embed** 把前端打进后端二进制，部署只需一个可
 make all    # = pnpm build + go build，生成单二进制 gosee（~40M，含前端 + 后端）
 ```
 
+**部署到 Linux**（从 macOS 交叉编译，无需 Linux 编译环境）：
+```bash
+make build-linux    # → gosee-linux-amd64（静态链接 ELF x86-64，~41M，零依赖）
+```
+> `glebarez/sqlite` 纯 Go 免 CGO，交叉编译无需 C 工具链。ARM64 服务器把 Makefile 里的 `GOARCH=amd64` 改成 `arm64` 即可。
+
+上传后在服务器上重命名为 `gosee` 即可（后续步骤统一用 `gosee`）。
+
 或手动分步：
 ```bash
 cd web && pnpm install && pnpm build   # 前端 → web/dist

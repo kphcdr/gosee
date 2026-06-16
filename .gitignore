@@ -1,5 +1,6 @@
 # 二进制
 gosee
+gosee-linux-*
 bin/
 *.exe
 
