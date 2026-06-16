@@ -16,9 +16,8 @@ LimitNOFILE=65536
 
 # 安全加固：限制权限
 NoNewPrivileges=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/gosee
 PrivateTmp=true
 
 [Install]
