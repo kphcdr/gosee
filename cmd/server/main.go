@@ -77,7 +77,7 @@ func main() {
 	}
 	authSvc := auth.NewService(userRepo, &cfg.JWT)
 	serverSvc := server.NewService(serverRepo, groupRepo, &cfg.Security, connectTimeout)
-	collectorSvc := collector.NewService(serverSvc, metricRepo, commandTimeout)
+	collectorSvc := collector.NewService(serverSvc, metricRepo, commandTimeout, cfg.Collector.MaxRetries)
 	groupSvc := server_group.NewService(groupRepo)
 
 	// 告警：规则 + 事件 + 评估器
@@ -102,10 +102,10 @@ func main() {
 	}
 
 	handlers := api.Handlers{
-		Auth:        handler.NewAuthHandler(authSvc),
-		Server:      handler.NewServerHandler(serverSvc, collectorSvc),
-		ServerGroup: handler.NewServerGroupHandler(groupSvc),
-		Collector:   handler.NewCollectorHandler(schedulerSvc),
+		Auth:                handler.NewAuthHandler(authSvc),
+		Server:              handler.NewServerHandler(serverSvc, collectorSvc),
+		ServerGroup:         handler.NewServerGroupHandler(groupSvc),
+		Collector:           handler.NewCollectorHandler(schedulerSvc),
 		AlertRule:           handler.NewAlertRuleHandler(alertSvc),
 		AlertEvent:          handler.NewAlertEventHandler(alertSvc),
 		NotificationChannel: handler.NewNotificationChannelHandler(notifierSvc),

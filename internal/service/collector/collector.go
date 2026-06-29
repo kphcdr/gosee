@@ -28,11 +28,15 @@ type Service struct {
 	resolver       SSHResolver
 	metricRepo     *repository.ServerMetricRepository
 	commandTimeout time.Duration
+	maxRetries     int
 	hook           AlertHook
 }
 
-func NewService(resolver SSHResolver, metricRepo *repository.ServerMetricRepository, commandTimeout time.Duration) *Service {
-	return &Service{resolver: resolver, metricRepo: metricRepo, commandTimeout: commandTimeout}
+func NewService(resolver SSHResolver, metricRepo *repository.ServerMetricRepository, commandTimeout time.Duration, maxRetries int) *Service {
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	return &Service{resolver: resolver, metricRepo: metricRepo, commandTimeout: commandTimeout, maxRetries: maxRetries}
 }
 
 // SetHook 注入告警评估钩子（采集完成后自动评估）
@@ -62,25 +66,32 @@ func (s *Service) Collect(serverID int64) (*CollectResult, error) {
 		return nil, err
 	}
 
-	client, err := sshclient.Connect(cfg)
+	var output string
+	for attempt := 0; attempt <= s.maxRetries; attempt++ {
+		client, connectErr := sshclient.Connect(cfg)
+		if connectErr != nil {
+			err = fmt.Errorf("SSH 连接失败: %w", connectErr)
+		} else {
+			output, err = sshclient.RunCommandWithTimeout(client, CollectScript, s.commandTimeout)
+			_ = client.Close()
+			if err != nil {
+				err = fmt.Errorf("采集脚本执行失败: %w", err)
+			}
+		}
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		_ = s.resolver.MarkStatus(serverID, model.ServerStatusOffline, err.Error())
-		s.notifyHook(serverID, nil, err) // SSH 失败 → 触发 ssh_fail 规则评估
-		return &CollectResult{ServerID: serverID, Error: "SSH 连接失败: " + err.Error()}, nil
-	}
-	defer client.Close()
-
-	output, err := sshclient.RunCommandWithTimeout(client, CollectScript, s.commandTimeout)
-	if err != nil {
-		_ = s.resolver.MarkStatus(serverID, model.ServerStatusOffline, "脚本执行失败: "+err.Error())
 		s.notifyHook(serverID, nil, err)
-		return &CollectResult{ServerID: serverID, Error: "采集脚本执行失败: " + err.Error()}, nil
+		return &CollectResult{ServerID: serverID, Error: err.Error()}, nil
 	}
 
 	data, err := parse(output)
 	if err != nil {
 		_ = s.resolver.MarkStatus(serverID, model.ServerStatusWarning, "数据解析失败: "+err.Error())
-		s.notifyHook(serverID, nil, err)
+		s.notifyHook(serverID, nil, nil) // SSH 可用，解析异常不属于 ssh_fail
 		return &CollectResult{ServerID: serverID, Error: "采集数据解析失败: " + err.Error()}, nil
 	}
 

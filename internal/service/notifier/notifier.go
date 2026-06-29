@@ -195,8 +195,9 @@ func (s *Service) buildAlertText(server *model.Server, event *model.AlertEvent) 
 服务器：%s
 IP：%s
 原因：SSH 连接失败
+连续失败：%s 次
 时间：%s`,
-			server.Name, server.Host, formatTime(event.LastTriggeredAt))
+			server.Name, server.Host, formatCount(event.CurrentValue), formatTime(event.LastTriggeredAt))
 	}
 	return fmt.Sprintf(`【服务器告警】
 
@@ -311,6 +312,13 @@ func formatValue(metric string, v *float64) string {
 		return fmt.Sprintf("%.0f 次", *v)
 	}
 	return fmt.Sprintf("%.2f", *v)
+}
+
+func formatCount(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.0f", *v)
 }
 
 func formatTime(t time.Time) string {

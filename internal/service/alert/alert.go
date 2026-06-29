@@ -111,18 +111,29 @@ func (s *Service) Evaluate(serverID int64, metric *model.ServerMetric, sshErr er
 	if err != nil {
 		return
 	}
+	sshFailureCount := 0
+	if sshErr != nil {
+		sshFailureCount, err = s.serverRepo.IncrementSSHFailureCount(serverID)
+	} else {
+		err = s.serverRepo.ResetSSHFailureCount(serverID)
+	}
+	if err != nil {
+		return
+	}
 	for i := range rules {
-		s.evaluateRule(server, &rules[i], metric, sshErr)
+		s.evaluateRule(server, &rules[i], metric, sshErr, sshFailureCount)
 	}
 }
 
-func (s *Service) evaluateRule(server *model.Server, rule *model.AlertRule, metric *model.ServerMetric, sshErr error) {
-	// SSH 失败规则：失败即触发、成功即恢复（失败无 metric 记录，连续次数简化）
+func (s *Service) evaluateRule(server *model.Server, rule *model.AlertRule, metric *model.ServerMetric, sshErr error, sshFailureCount int) {
+	// SSH 规则同样严格遵循运算符、阈值和连续次数。
 	if rule.Metric == model.MetricSSHFail {
-		if sshErr != nil {
-			s.fireEvent(server, rule, 1, rule.Threshold)
+		if sshErr != nil && sshFailureCount >= rule.DurationTimes && compare(float64(sshFailureCount), rule.Operator, rule.Threshold) {
+			s.fireEvent(server, rule, float64(sshFailureCount), rule.Threshold)
 		} else {
-			s.recoverEvent(server, rule)
+			if sshErr == nil {
+				s.recoverEvent(server, rule)
+			}
 		}
 		return
 	}
@@ -158,6 +169,8 @@ func (s *Service) fireEvent(server *model.Server, rule *model.AlertRule, value, 
 				zap.Float64("value", value),
 			)
 		}
+		existing.CurrentValue = &v
+		existing.LastTriggeredAt = time.Now()
 		s.notifyFired(existing)
 		return
 	}

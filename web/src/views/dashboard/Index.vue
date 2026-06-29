@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h, onMounted, computed } from 'vue'
+import { ref, h, onMounted } from 'vue'
 import { NTag, type DataTableColumns } from 'naive-ui'
 import { dashboardApi } from '@/api/dashboard'
 import { serverGroupApi } from '@/api/serverGroup'
@@ -18,11 +18,6 @@ const recentAlerts = ref<RecentAlert[]>([])
 const loading = ref(false)
 const groups = ref<ServerGroup[]>([])
 const selectedGroupId = ref(0)
-const groupOptions = computed(() => [
-  { label: '全部分组', value: 0 },
-  ...groups.value.map((group) => ({ label: group.name, value: group.id })),
-])
-
 async function loadAll() {
   loading.value = true
   try {
@@ -89,15 +84,20 @@ const alertColumns: DataTableColumns<RecentAlert> = [
   <n-spin :show="loading">
     <n-space vertical size="large">
       <n-card size="small">
-        <n-space align="center">
+        <div class="group-filter">
           <span class="filter-label">服务器分组</span>
-          <n-select
+          <n-tabs
             v-model:value="selectedGroupId"
-            :options="groupOptions"
-            style="width: 220px"
+            type="line"
+            :animated="false"
+            pane-style="display: none"
+            class="group-tabs"
             @update:value="loadAll"
-          />
-        </n-space>
+          >
+            <n-tab-pane :name="0" tab="全部分组" />
+            <n-tab-pane v-for="group in groups" :key="group.id" :name="group.id" :tab="group.name" />
+          </n-tabs>
+        </div>
       </n-card>
 
       <n-grid :cols="4" :x-gap="16">
@@ -135,5 +135,25 @@ const alertColumns: DataTableColumns<RecentAlert> = [
   color: var(--n-text-color);
   font-weight: 500;
   white-space: nowrap;
+}
+
+.group-filter {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+}
+
+.group-tabs {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .group-filter {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
 }
 </style>

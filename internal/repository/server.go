@@ -118,3 +118,21 @@ func (r *ServerRepository) UpdateStatus(id int64, status string, lastError strin
 	}
 	return r.db.Model(&model.Server{}).Where("id = ?", id).Updates(updates).Error
 }
+
+// IncrementSSHFailureCount 原子增加连续 SSH 失败次数，并返回增加后的值。
+func (r *ServerRepository) IncrementSSHFailureCount(id int64) (int, error) {
+	if err := r.db.Model(&model.Server{}).Where("id = ?", id).
+		UpdateColumn("ssh_failure_count", gorm.Expr("ssh_failure_count + 1")).Error; err != nil {
+		return 0, err
+	}
+	var server model.Server
+	if err := r.db.Select("ssh_failure_count").First(&server, id).Error; err != nil {
+		return 0, err
+	}
+	return server.SSHFailureCount, nil
+}
+
+// ResetSSHFailureCount 在 SSH 恢复成功后清零连续失败次数。
+func (r *ServerRepository) ResetSSHFailureCount(id int64) error {
+	return r.db.Model(&model.Server{}).Where("id = ?", id).UpdateColumn("ssh_failure_count", 0).Error
+}

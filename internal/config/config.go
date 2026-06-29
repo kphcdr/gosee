@@ -9,11 +9,11 @@ import (
 
 // Config 全局配置，对应 configs/config.yaml
 type Config struct {
-	App      AppConfig      `mapstructure:"app"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	Admin    AdminConfig    `mapstructure:"admin"`
+	App       AppConfig       `mapstructure:"app"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	Redis     RedisConfig     `mapstructure:"redis"`
+	JWT       JWTConfig       `mapstructure:"jwt"`
+	Admin     AdminConfig     `mapstructure:"admin"`
 	Security  SecurityConfig  `mapstructure:"security"`
 	Log       LogConfig       `mapstructure:"log"`
 	Collector CollectorConfig `mapstructure:"collector"`
@@ -62,9 +62,9 @@ type LogConfig struct {
 type CollectorConfig struct {
 	Interval          string `mapstructure:"interval"`            // cron @every 间隔，如 "10m"
 	WorkerCount       int    `mapstructure:"worker_count"`        // 并发 worker 数
-	SSHConnectTimeout string `mapstructure:"ssh_connect_timeout"`  // SSH 连接超时
+	SSHConnectTimeout string `mapstructure:"ssh_connect_timeout"` // SSH 连接超时
 	SSHCommandTimeout string `mapstructure:"ssh_command_timeout"` // 脚本执行超时
-	MaxRetries        int    `mapstructure:"max_retries"`         // 单台失败重试次数（第一版预留）
+	MaxRetries        int    `mapstructure:"max_retries"`         // 单台采集失败后的重试次数
 }
 
 // Load 读取并解析配置文件。configPath 为空时默认 configs/config.yaml。

@@ -32,14 +32,17 @@ type Server struct {
 	Remark              string     `gorm:"size:500" json:"remark"`
 	Status              string     `gorm:"size:20;not null;default:unknown;index" json:"status"`
 	Enabled             int8       `gorm:"not null;default:1;index" json:"enabled"` // 1=启用 0=禁用
-	LastCheckedAt *time.Time `json:"last_checked_at"`
-	LastError     *string    `gorm:"type:text" json:"last_error"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	LastCheckedAt       *time.Time `json:"last_checked_at"`
+	LastError           *string    `gorm:"type:text" json:"last_error"`
+	SSHFailureCount     int        `gorm:"not null;default:0" json:"ssh_failure_count"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // HasPrivateKey 是否已配置私钥
-func (s Server) HasPrivateKey() bool { return s.PrivateKeyEncrypted != nil && *s.PrivateKeyEncrypted != "" }
+func (s Server) HasPrivateKey() bool {
+	return s.PrivateKeyEncrypted != nil && *s.PrivateKeyEncrypted != ""
+}
 
 // HasPassword 是否已配置密码
 func (s Server) HasPassword() bool { return s.PasswordEncrypted != nil && *s.PasswordEncrypted != "" }
