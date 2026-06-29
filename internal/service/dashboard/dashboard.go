@@ -36,8 +36,8 @@ type Summary struct {
 	Offline  int64 `json:"offline"`
 }
 
-func (s *Service) Summary() (*Summary, error) {
-	servers, err := s.serverRepo.ListEnabled()
+func (s *Service) Summary(groupID *int64) (*Summary, error) {
+	servers, err := s.serverRepo.ListEnabledByGroup(groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +65,8 @@ type TopItem struct {
 	Value    float64 `json:"value"`
 }
 
-func (s *Service) top(field string, limit int) ([]TopItem, error) {
-	metrics, err := s.metricRepo.LatestMetricsOfEnabled()
+func (s *Service) top(field string, limit int, groupID *int64) ([]TopItem, error) {
+	metrics, err := s.metricRepo.LatestMetricsOfEnabledByGroup(groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -96,9 +96,9 @@ func (s *Service) top(field string, limit int) ([]TopItem, error) {
 	return result, nil
 }
 
-func (s *Service) TopCPU() ([]TopItem, error)     { return s.top("cpu", 5) }
-func (s *Service) TopMemory() ([]TopItem, error)  { return s.top("memory", 5) }
-func (s *Service) TopDisk() ([]TopItem, error)    { return s.top("disk", 5) }
+func (s *Service) TopCPU(groupID *int64) ([]TopItem, error)    { return s.top("cpu", 5, groupID) }
+func (s *Service) TopMemory(groupID *int64) ([]TopItem, error) { return s.top("memory", 5, groupID) }
+func (s *Service) TopDisk(groupID *int64) ([]TopItem, error)   { return s.top("disk", 5, groupID) }
 
 // RecentAlert 最近告警（映射自 alert_events）
 type RecentAlert struct {
@@ -111,11 +111,11 @@ type RecentAlert struct {
 	TriggeredAt time.Time `json:"triggered_at"`
 }
 
-func (s *Service) RecentAlerts(limit int) ([]RecentAlert, error) {
+func (s *Service) RecentAlerts(limit int, groupID *int64) ([]RecentAlert, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 10
 	}
-	events, err := s.alertEventRepo.List(limit)
+	events, err := s.alertEventRepo.ListByGroup(limit, groupID)
 	if err != nil {
 		return nil, err
 	}

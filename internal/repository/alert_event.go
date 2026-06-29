@@ -23,14 +23,23 @@ type AlertEventView struct {
 
 // List 最近事件列表（按最近触发时间倒序），JOIN 填充 server/rule 名
 func (r *AlertEventRepository) List(limit int) ([]AlertEventView, error) {
+	return r.ListByGroup(limit, nil)
+}
+
+// ListByGroup 查询指定分组的最近事件；groupID 为空时查询全部。
+func (r *AlertEventRepository) ListByGroup(limit int, groupID *int64) ([]AlertEventView, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
 	var rows []AlertEventView
-	err := r.db.Table("alert_events").
+	tx := r.db.Table("alert_events").
 		Select("alert_events.*, servers.name AS server_name, alert_rules.name AS rule_name").
 		Joins("LEFT JOIN servers ON servers.id = alert_events.server_id").
-		Joins("LEFT JOIN alert_rules ON alert_rules.id = alert_events.alert_rule_id").
+		Joins("LEFT JOIN alert_rules ON alert_rules.id = alert_events.alert_rule_id")
+	if groupID != nil {
+		tx = tx.Where("servers.group_id = ?", *groupID)
+	}
+	err := tx.
 		Order("alert_events.last_triggered_at DESC").
 		Limit(limit).
 		Find(&rows).Error

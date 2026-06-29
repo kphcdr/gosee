@@ -76,8 +76,17 @@ func (r *ServerRepository) FindEnabledByID(id int64) (*model.Server, error) {
 
 // ListEnabled 查询全部启用的服务器（供定时全量采集使用）
 func (r *ServerRepository) ListEnabled() ([]model.Server, error) {
+	return r.ListEnabledByGroup(nil)
+}
+
+// ListEnabledByGroup 查询指定分组的启用服务器；groupID 为空时查询全部。
+func (r *ServerRepository) ListEnabledByGroup(groupID *int64) ([]model.Server, error) {
 	var servers []model.Server
-	err := r.db.Where("enabled = 1").Order("id ASC").Find(&servers).Error
+	tx := r.db.Where("enabled = 1")
+	if groupID != nil {
+		tx = tx.Where("group_id = ?", *groupID)
+	}
+	err := tx.Order("id ASC").Find(&servers).Error
 	return servers, err
 }
 

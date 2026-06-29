@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, h, onMounted } from 'vue'
+import { ref, h, onMounted, computed } from 'vue'
 import { NTag, type DataTableColumns } from 'naive-ui'
 import { dashboardApi } from '@/api/dashboard'
+import { serverGroupApi } from '@/api/serverGroup'
 import type { DashboardSummary, TopItem, RecentAlert } from '@/types/dashboard'
 import { formatTime, formatPercent } from '@/utils/format'
 import { levelLabel, levelType } from '@/constants/alert'
 import { usePolling } from '@/composables/usePolling'
 import RankBars from '@/components/RankBars.vue'
+import type { ServerGroup } from '@/types/serverGroup'
 
 const summary = ref<DashboardSummary | null>(null)
 const topCpu = ref<TopItem[]>([])
@@ -14,16 +16,23 @@ const topMemory = ref<TopItem[]>([])
 const topDisk = ref<TopItem[]>([])
 const recentAlerts = ref<RecentAlert[]>([])
 const loading = ref(false)
+const groups = ref<ServerGroup[]>([])
+const selectedGroupId = ref(0)
+const groupOptions = computed(() => [
+  { label: '全部分组', value: 0 },
+  ...groups.value.map((group) => ({ label: group.name, value: group.id })),
+])
 
 async function loadAll() {
   loading.value = true
   try {
+    const groupId = selectedGroupId.value || undefined
     const [s, c, m, d, a] = await Promise.all([
-      dashboardApi.summary(),
-      dashboardApi.topCpu(),
-      dashboardApi.topMemory(),
-      dashboardApi.topDisk(),
-      dashboardApi.recentAlerts(),
+      dashboardApi.summary(groupId),
+      dashboardApi.topCpu(groupId),
+      dashboardApi.topMemory(groupId),
+      dashboardApi.topDisk(groupId),
+      dashboardApi.recentAlerts(groupId),
     ])
     summary.value = s
     topCpu.value = c
@@ -35,7 +44,10 @@ async function loadAll() {
   }
 }
 
-onMounted(loadAll)
+onMounted(async () => {
+  groups.value = await serverGroupApi.list().catch(() => [])
+  await loadAll()
+})
 usePolling(loadAll, 30_000)
 
 const alertColumns: DataTableColumns<RecentAlert> = [
@@ -76,6 +88,18 @@ const alertColumns: DataTableColumns<RecentAlert> = [
 <template>
   <n-spin :show="loading">
     <n-space vertical size="large">
+      <n-card size="small">
+        <n-space align="center">
+          <span class="filter-label">服务器分组</span>
+          <n-select
+            v-model:value="selectedGroupId"
+            :options="groupOptions"
+            style="width: 220px"
+            @update:value="loadAll"
+          />
+        </n-space>
+      </n-card>
+
       <n-grid :cols="4" :x-gap="16">
         <n-gi>
           <n-card><n-statistic label="服务器总数" :value="summary?.total ?? 0" /></n-card>
@@ -105,3 +129,11 @@ const alertColumns: DataTableColumns<RecentAlert> = [
     </n-space>
   </n-spin>
 </template>
+
+<style scoped>
+.filter-label {
+  color: var(--n-text-color);
+  font-weight: 500;
+  white-space: nowrap;
+}
+</style>

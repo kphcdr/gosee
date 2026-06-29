@@ -103,12 +103,20 @@ type LatestMetricView struct {
 
 // LatestMetricsOfEnabled 取所有启用服务器的最新一条指标（含 name/host）
 func (r *ServerMetricRepository) LatestMetricsOfEnabled() ([]LatestMetricView, error) {
+	return r.LatestMetricsOfEnabledByGroup(nil)
+}
+
+// LatestMetricsOfEnabledByGroup 取指定分组中启用服务器的最新指标；groupID 为空时查询全部。
+func (r *ServerMetricRepository) LatestMetricsOfEnabledByGroup(groupID *int64) ([]LatestMetricView, error) {
 	var rows []LatestMetricView
-	err := r.db.Table("servers").
+	tx := r.db.Table("servers").
 		Select(`servers.id AS server_id, servers.name, servers.host,
 			m.cpu_usage, m.memory_usage, m.disk_max_usage, m.collected_at`).
 		Joins("LEFT JOIN server_metrics m ON m.id = (SELECT id FROM server_metrics WHERE server_id = servers.id ORDER BY collected_at DESC LIMIT 1)").
-		Where("servers.enabled = 1").
-		Scan(&rows).Error
+		Where("servers.enabled = 1")
+	if groupID != nil {
+		tx = tx.Where("servers.group_id = ?", *groupID)
+	}
+	err := tx.Scan(&rows).Error
 	return rows, err
 }
