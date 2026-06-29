@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 
 	"gosee/internal/model"
@@ -28,6 +30,15 @@ func (r *AlertEventRepository) List(limit int) ([]AlertEventView, error) {
 
 // ListByGroup 查询指定分组的最近事件；groupID 为空时查询全部。
 func (r *AlertEventRepository) ListByGroup(limit int, groupID *int64) ([]AlertEventView, error) {
+	return r.listByGroupSince(limit, groupID, nil)
+}
+
+// ListByGroupSince 查询指定分组在给定时间之后的最近事件。
+func (r *AlertEventRepository) ListByGroupSince(limit int, groupID *int64, since time.Time) ([]AlertEventView, error) {
+	return r.listByGroupSince(limit, groupID, &since)
+}
+
+func (r *AlertEventRepository) listByGroupSince(limit int, groupID *int64, since *time.Time) ([]AlertEventView, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
@@ -38,6 +49,9 @@ func (r *AlertEventRepository) ListByGroup(limit int, groupID *int64) ([]AlertEv
 		Joins("LEFT JOIN alert_rules ON alert_rules.id = alert_events.alert_rule_id")
 	if groupID != nil {
 		tx = tx.Where("servers.group_id = ?", *groupID)
+	}
+	if since != nil {
+		tx = tx.Where("alert_events.last_triggered_at >= ?", *since)
 	}
 	err := tx.
 		Order("alert_events.last_triggered_at DESC").

@@ -115,7 +115,7 @@ func (s *Service) RecentAlerts(limit int, groupID *int64) ([]RecentAlert, error)
 	if limit <= 0 || limit > 50 {
 		limit = 10
 	}
-	events, err := s.alertEventRepo.ListByGroup(limit, groupID)
+	events, err := s.alertEventRepo.ListByGroupSince(limit, groupID, time.Now().Add(-72*time.Hour))
 	if err != nil {
 		return nil, err
 	}
