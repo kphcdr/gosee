@@ -48,3 +48,12 @@ collector:
   ssh_connect_timeout: "5s"
   ssh_command_timeout: "15s"
   max_retries: 1
+
+# 数据保留与自动清理：按保留天数删除过期时序数据，防止数据库无限增长。
+retention:
+  enabled: true
+  schedule: "0 3 * * *"      # 每天 03:00 执行一次清理
+  metrics_days: 30           # 监控指标(含磁盘明细)保留天数
+  alert_events_days: 90      # 已结束告警事件保留天数
+  notifications_days: 90     # 通知发送记录保留天数
+  batch_size: 1000           # 分批删除每批上限

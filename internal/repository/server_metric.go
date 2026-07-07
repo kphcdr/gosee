@@ -120,3 +120,38 @@ func (r *ServerMetricRepository) LatestMetricsOfEnabledByGroup(groupID *int64) (
 	err := tx.Scan(&rows).Error
 	return rows, err
 }
+
+// DeleteMetricsBefore 删除 collected_at 早于 t 的指标记录，并在同一事务中级联删除关联的磁盘明细。
+// 分批处理（每批 batch 条），避免单事务过大长时间持锁阻塞采集。返回累计删除的指标条数。
+func (r *ServerMetricRepository) DeleteMetricsBefore(t time.Time, batch int) (int64, error) {
+	if batch <= 0 {
+		batch = 1000
+	}
+	var total int64
+	for {
+		var ids []int64
+		if err := r.db.Model(&model.ServerMetric{}).
+			Where("collected_at < ?", t).
+			Limit(batch).Pluck("id", &ids).Error; err != nil {
+			return total, err
+		}
+		if len(ids) == 0 {
+			break
+		}
+		if err := r.db.Transaction(func(tx *gorm.DB) error {
+			// 先删子表 server_disks，避免孤儿记录
+			if err := tx.Where("metric_id IN ?", ids).Delete(&model.ServerDisk{}).Error; err != nil {
+				return err
+			}
+			// 再删父表 server_metrics
+			return tx.Where("id IN ?", ids).Delete(&model.ServerMetric{}).Error
+		}); err != nil {
+			return total, err
+		}
+		total += int64(len(ids))
+		if len(ids) < batch {
+			break // 已无更多数据
+		}
+	}
+	return total, nil
+}

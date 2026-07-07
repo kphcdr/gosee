@@ -17,6 +17,7 @@ type Config struct {
 	Security  SecurityConfig  `mapstructure:"security"`
 	Log       LogConfig       `mapstructure:"log"`
 	Collector CollectorConfig `mapstructure:"collector"`
+	Retention RetentionConfig `mapstructure:"retention"`
 }
 
 type AppConfig struct {
@@ -65,6 +66,18 @@ type CollectorConfig struct {
 	SSHConnectTimeout string `mapstructure:"ssh_connect_timeout"` // SSH 连接超时
 	SSHCommandTimeout string `mapstructure:"ssh_command_timeout"` // 脚本执行超时
 	MaxRetries        int    `mapstructure:"max_retries"`         // 单台采集失败后的重试次数
+}
+
+// RetentionConfig 数据保留与自动清理配置。
+// SQLite 的 DELETE 不缩小 db 文件，删除的页进入 freelist 被后续插入复用，
+// 增长会趋于稳态；如需真正回收磁盘，低峰期手动 `sqlite3 gosee.db "VACUUM"`。
+type RetentionConfig struct {
+	Enabled           bool   `mapstructure:"enabled"`            // 总开关
+	Schedule          string `mapstructure:"schedule"`           // 5 字段标准 cron 表达式，默认 "0 3 * * *"（每天 03:00）
+	MetricsDays       int    `mapstructure:"metrics_days"`       // server_metrics + server_disks 保留天数；<=0 表示不清理
+	AlertEventsDays   int    `mapstructure:"alert_events_days"`  // 已结束告警事件(status<>firing)保留天数；<=0 表示不清理
+	NotificationsDays int    `mapstructure:"notifications_days"` // 通知发送记录保留天数；<=0 表示不清理
+	BatchSize         int    `mapstructure:"batch_size"`         // 分批删除每批上限，控制单事务时长避免锁库
 }
 
 // Load 读取并解析配置文件。configPath 为空时默认 configs/config.yaml。

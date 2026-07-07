@@ -24,6 +24,7 @@ import (
 	"gosee/internal/service/collector"
 	"gosee/internal/service/dashboard"
 	"gosee/internal/service/notifier"
+	"gosee/internal/service/retention"
 	"gosee/internal/service/server"
 	"gosee/internal/service/server_group"
 	"gosee/internal/utils"
@@ -99,6 +100,19 @@ func main() {
 	schedulerSvc := scheduler.New(collectorSvc, serverRepo, &cfg.Collector)
 	if err := schedulerSvc.Start(cfg.Collector.Interval); err != nil {
 		utils.Logger.Fatal("启动定时采集失败", zap.Error(err))
+	}
+
+	// 数据保留清理任务（复用采集调度器的 cron 实例）
+	retentionSvc := retention.NewService(metricRepo, alertEventRepo, notifyRepo, &cfg.Retention)
+	if cfg.Retention.Enabled {
+		if err := schedulerSvc.AddJob(cfg.Retention.Schedule, retentionSvc.Run); err != nil {
+			utils.Logger.Fatal("注册数据清理任务失败", zap.Error(err))
+		}
+		utils.Logger.Info("数据清理任务已注册",
+			zap.String("schedule", cfg.Retention.Schedule),
+			zap.Int("metrics_days", cfg.Retention.MetricsDays),
+			zap.Int("alert_events_days", cfg.Retention.AlertEventsDays),
+		)
 	}
 
 	handlers := api.Handlers{

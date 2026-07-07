@@ -104,3 +104,32 @@ func (r *AlertEventRepository) UpdateNotified(id int64) error {
 			"notify_count":     gorm.Expr("notify_count + 1"),
 		}).Error
 }
+
+// DeleteEndedBefore 删除 status<>firing 且 updated_at 早于 t 的告警事件（绝不删正在触发的事件）。
+// 分批处理，返回累计删除条数。调用方应在此之前先清理 alert_notifications，避免孤儿通知记录。
+func (r *AlertEventRepository) DeleteEndedBefore(t time.Time, batch int) (int64, error) {
+	if batch <= 0 {
+		batch = 1000
+	}
+	var total int64
+	for {
+		var ids []int64
+		if err := r.db.Model(&model.AlertEvent{}).
+			Where("status <> ? AND updated_at < ?", model.EventStatusFiring, t).
+			Limit(batch).Pluck("id", &ids).Error; err != nil {
+			return total, err
+		}
+		if len(ids) == 0 {
+			break
+		}
+		res := r.db.Where("id IN ?", ids).Delete(&model.AlertEvent{})
+		if res.Error != nil {
+			return total, res.Error
+		}
+		total += res.RowsAffected
+		if len(ids) < batch {
+			break
+		}
+	}
+	return total, nil
+}

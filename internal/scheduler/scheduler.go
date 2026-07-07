@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -61,6 +62,15 @@ func (s *Scheduler) Stop() {
 		<-ctx.Done()
 		utils.Logger.Info("定时采集已停止")
 	}
+}
+
+// AddJob 把额外的定时任务注册到同一个 cron 实例，与采集任务共享生命周期与优雅退出。
+// spec 为标准 5 字段 cron 表达式或 @every 形式；可在 Start 之后调用（robfig/cron 支持运行时添加）。
+func (s *Scheduler) AddJob(spec string, cmd func()) error {
+	if _, err := s.cron.AddFunc(spec, cmd); err != nil {
+		return fmt.Errorf("注册定时任务失败 %s: %w", spec, err)
+	}
+	return nil
 }
 
 // safeCollectAll 带防重叠保护的定时任务入口

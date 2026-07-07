@@ -44,7 +44,7 @@
 - [ ] 私钥 passphrase 采集时透传支持
 - [ ] ssh_fail 连续失败计数（失败历史记录，替代当前的"失败即触发"简化）
 - [ ] Telegram Bot / SMTP 邮件通知（阶段六只做了飞书）
-- [ ] 指标数据保留策略（定期清理老旧 metrics，避免膨胀）
+- [x] 指标数据保留策略（retention 定时清理 metrics/disks/events/notifications，保留天数可配置，见 config.yaml `retention` 段；含集成测试）
 - [ ] 登录失败次数限制（PRD 15.3）
 - [ ] 操作日志（PRD 15.3 / 7.3）
 - [ ] `server_metrics` 大数据量下的索引/分区优化

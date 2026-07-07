@@ -42,3 +42,14 @@ collector:
   ssh_connect_timeout: "5s"  # SSH 连接超时
   ssh_command_timeout: "15s" # 采集脚本执行超时
   max_retries: 1             # 单台失败重试次数
+
+# 数据保留与自动清理：按保留天数删除过期时序数据，防止数据库无限增长。
+# SQLite 删除后走 freelist 复用、增长趋稳；如需真正回收磁盘文件，低峰期手动：
+#   sqlite3 gosee.db "VACUUM"
+retention:
+  enabled: true
+  schedule: "0 3 * * *"      # 5 字段标准 cron，每天 03:00 执行一次清理
+  metrics_days: 30           # 监控指标(含磁盘明细)保留 30 天
+  alert_events_days: 90      # 已结束告警事件(status<>firing)保留 90 天
+  notifications_days: 90     # 通知发送记录保留 90 天
+  batch_size: 1000           # 分批删除每批上限，避免大事务锁库阻塞采集
