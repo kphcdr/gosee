@@ -13,8 +13,13 @@ The Go API starts at `cmd/server/main.go`. Backend code lives under `internal/`:
 - `go test ./...`: run all backend tests.
 - `cd web && pnpm build`: type-check and build the frontend only.
 - `make build-linux`: create a static Linux amd64 deployment binary.
+- `make publish`: check, build, upload, back up, and atomically replace the production binary. It never restarts or stops the service.
 
 Use pnpm for frontend dependencies and commit changes to `web/pnpm-lock.yaml`.
+
+## Production Release Boundary
+
+Production updates must follow `DEPLOY.md`. Automation and assistants may only build and upload the binary, preserve `gosee.bak`, atomically replace `gosee`, and verify file checksums. The service operator owns all process and container lifecycle actions. Do not run restart, stop, kill, Docker lifecycle, or systemd lifecycle commands unless the user explicitly requests that separate action.
 
 ## Coding Style & Naming Conventions
 

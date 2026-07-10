@@ -16,7 +16,7 @@
 - **通知系统**：飞书 webhook（含可选签名校验），告警/恢复/离线文案，notify_interval 防重复
 - **仪表盘**：服务器状态汇总 + CPU/内存/磁盘 Top5 + 最近告警
 - **前端后台**：Vue3 + TS + Naive UI + ECharts，10 个页面，全真实接口
-- **部署**：Go embed 前端，单二进制 + systemd + Nginx
+- **部署**：Go embed 前端，单二进制 + Docker/systemd + Nginx
 
 ---
 
@@ -158,11 +158,14 @@ Makefile / DEPLOY.md / todo.md
 
 ## 部署
 
-单二进制（Go embed 前端 + SQLite + systemd）。完整步骤见 **[DEPLOY.md](./DEPLOY.md)**。
+单二进制（Go embed 前端 + SQLite）。完整步骤和生产更新职责边界见 **[DEPLOY.md](./DEPLOY.md)**。
 
 ```bash
-make all    # 构建单二进制 gosee（含前端）
+make all        # 本地构建单二进制 gosee（含前端）
+make publish    # 生产：检查、构建、上传、备份、原子替换；不重启服务
 ```
+
+页面左下角显示 `vYYYY.MM.DD-HHmm` 格式的构建版本。生产服务的停止、启动、重启和重启后验证均由服务管理员负责，发布自动化只处理二进制文件。
 
 **生产必做**：替换 `jwt.secret` 与 `security.encryption_key`（`openssl rand -hex 32`）。
 

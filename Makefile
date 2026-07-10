@@ -68,9 +68,9 @@ install:
 deploy: all
 	@echo "✅ 部署产物：gosee + configs/config.prod.yaml + deploy/"
 
-# 一条龙发布到生产：检查 → 构建 → 上传 → 备份替换
+# 发布到生产：检查 → 构建 → 上传 → 备份替换（仅处理二进制）
 # 仅更新二进制，不覆盖线上 config.yaml、gosee.db 和日志。
-# 服务进程由用户自行管理（非 systemd），发布后需手动重启 gosee。
+# 服务进程由用户自行管理；本目标严禁停止、重启或操作线上服务。
 publish: check build-linux
 	scp gosee-linux-amd64 $(SSH_TARGET):$(REMOTE_DIR)/.$(SERVICE_NAME).new
 	ssh $(SSH_TARGET) 'set -e; \
@@ -80,7 +80,7 @@ publish: check build-linux
 		mv .$(SERVICE_NAME).new $(SERVICE_NAME); \
 		echo "✅ 二进制已更新：$(REMOTE_DIR)/$(SERVICE_NAME)"; \
 		if [ -f $(SERVICE_NAME).bak ]; then echo "📦 旧版本备份：$(SERVICE_NAME).bak（回滚：mv $(SERVICE_NAME).bak $(SERVICE_NAME)）"; fi; \
-		echo "⚠️  服务由你自行管理，请手动重启 gosee 进程"; \
+		echo "ℹ️  二进制上传完成；服务重启和验证由服务管理员处理"; \
 		echo "   健康检查：curl $(HEALTH_URL)"'
 
 # ===== 帮助 =====
@@ -98,4 +98,4 @@ help:
 	@echo "  make build-linux 交叉编译 Linux amd64 单二进制（部署到 Linux 服务器）"
 	@echo "                    可用 VERSION=vYYYY.MM.DD-HHmm 覆盖自动版本号"
 	@echo "  make deploy     构建部署产物"
-	@echo "  make publish    构建并上传二进制到生产（备份旧版，手动重启）"
+	@echo "  make publish    构建并上传二进制到生产（备份替换，不操作服务）"

@@ -1,6 +1,76 @@
-# gosee 部署指南（单二进制 + SQLite + systemd）
+# gosee 部署指南（单二进制 + SQLite）
 
-gosee 采用 **Go embed** 把前端打进后端二进制，部署只需一个可执行文件 + 一个配置文件，零外部依赖（SQLite 文件存储）。
+gosee 采用 **Go embed** 把前端打进后端二进制，部署只需一个可执行文件 + 一个配置文件，零外部依赖（SQLite 文件存储）。服务可由容器或 systemd 管理。
+
+## 生产更新标准流程（必须遵守）
+
+当前生产环境的更新职责明确分离：
+
+- **发布执行方/自动化**：只负责检查、构建、上传、备份和原子替换二进制。
+- **服务管理员**：负责停止、启动、重启服务，以及重启后的业务验证。
+- 除非服务管理员另有明确指令，发布执行方**不得**运行 `docker restart`、`systemctl restart`、`kill` 等服务管理命令。
+
+当前 Makefile 默认发布位置：
+
+```text
+SSH_TARGET=root@47.111.129.138
+REMOTE_DIR=/data/www/sites/gosee
+SERVICE_NAME=gosee
+```
+
+### 1. 构建并上传
+
+在项目根目录执行：
+
+```bash
+make publish
+```
+
+该命令只执行以下操作：
+
+1. `make check`：前端类型检查和 `go vet`。
+2. 构建前端，并生成 `vYYYY.MM.DD-HHmm` 格式的页面版本号。
+3. 交叉编译 `gosee-linux-amd64`。
+4. 上传为远端临时文件 `.gosee.new`。
+5. 将原二进制备份为 `gosee.bak`。
+6. 使用 `mv` 原子替换远端 `gosee`。
+
+它不会覆盖线上 `config.yaml`、`gosee.db` 或日志，也不会重启服务。
+
+需要指定发布时间版本时：
+
+```bash
+make publish VERSION=v2026.07.10-1207
+```
+
+### 2. 校验上传结果
+
+上传后比较本地和远端 SHA-256：
+
+```bash
+SSH_TARGET=root@47.111.129.138
+REMOTE_DIR=/data/www/sites/gosee
+SERVICE_NAME=gosee
+
+shasum -a 256 gosee-linux-amd64
+ssh "$SSH_TARGET" "sha256sum $REMOTE_DIR/$SERVICE_NAME"
+```
+
+两边校验值必须一致。发布执行方应向服务管理员报告：远端二进制路径、备份路径、校验值和页面版本号。
+
+### 3. 服务交接
+
+二进制上传完成即结束自动化发布。服务管理员根据线上实际运行方式自行重启并验证；当前生产服务即使运行在 Docker 容器中，发布执行方也不操作容器。
+
+### 4. 回滚二进制
+
+只有在服务管理员明确要求回滚时，才恢复备份：
+
+```bash
+ssh "$SSH_TARGET" 'cd /data/www/sites/gosee && cp -p gosee gosee.failed && cp -p gosee.bak gosee'
+```
+
+恢复二进制后仍由服务管理员负责重启和验证。
 
 ---
 
@@ -108,10 +178,14 @@ sudo journalctl -u gosee -f          # systemd 日志
 ```
 
 ### 升级
+
+生产升级统一遵循文档顶部的“生产更新标准流程”：
+
 ```bash
-# 本地重新 build（pnpm build && go build）→ scp 新二进制 → 重启
-sudo systemctl restart gosee
+make publish
 ```
+
+该命令仅上传和替换二进制，不负责重启服务。
 
 ### 备份
 ```bash
