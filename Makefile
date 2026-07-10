@@ -1,10 +1,10 @@
 .PHONY: all frontend backend run dev typecheck vet test clean tidy deploy publish help
 
 # ===== 生产发布配置（命令行可覆盖，例如 make publish SSH_TARGET=root@host）=====
-SSH_TARGET ?= root@114.215.131.37
-REMOTE_DIR ?= /data/www/system.kphcdr.com
+SSH_TARGET ?= root@47.111.129.138
+REMOTE_DIR ?= /data/www/sites/gosee
 SERVICE_NAME ?= gosee
-HEALTH_URL ?= http://127.0.0.1:8910/health
+HEALTH_URL ?= http://127.0.0.1:8080/health
 
 # ===== 构建 =====
 
@@ -67,8 +67,9 @@ install:
 deploy: all
 	@echo "✅ 部署产物：gosee + configs/config.prod.yaml + deploy/"
 
-# 一条龙发布到生产：检查 → 构建 → 上传 → 备份替换 → 重启 → 健康检查
+# 一条龙发布到生产：检查 → 构建 → 上传 → 备份替换
 # 仅更新二进制，不覆盖线上 config.yaml、gosee.db 和日志。
+# 服务进程由用户自行管理（非 systemd），发布后需手动重启 gosee。
 publish: check build-linux
 	scp gosee-linux-amd64 $(SSH_TARGET):$(REMOTE_DIR)/.$(SERVICE_NAME).new
 	ssh $(SSH_TARGET) 'set -e; \
@@ -76,22 +77,10 @@ publish: check build-linux
 		chmod +x .$(SERVICE_NAME).new; \
 		if [ -f $(SERVICE_NAME) ]; then cp -p $(SERVICE_NAME) $(SERVICE_NAME).bak; fi; \
 		mv .$(SERVICE_NAME).new $(SERVICE_NAME); \
-		systemctl restart $(SERVICE_NAME); \
-		for i in $$(seq 1 15); do \
-			if curl -fsS $(HEALTH_URL) >/dev/null; then \
-				echo "✅ $(SERVICE_NAME) 发布成功，健康检查通过"; \
-				systemctl status $(SERVICE_NAME) --no-pager; \
-				exit 0; \
-			fi; \
-			sleep 1; \
-		done; \
-		echo "❌ 健康检查失败，正在回滚"; \
-		if [ -f $(SERVICE_NAME).bak ]; then \
-			mv $(SERVICE_NAME).bak $(SERVICE_NAME); \
-			systemctl restart $(SERVICE_NAME); \
-		fi; \
-		systemctl status $(SERVICE_NAME) --no-pager || true; \
-		exit 1'
+		echo "✅ 二进制已更新：$(REMOTE_DIR)/$(SERVICE_NAME)"; \
+		if [ -f $(SERVICE_NAME).bak ]; then echo "📦 旧版本备份：$(SERVICE_NAME).bak（回滚：mv $(SERVICE_NAME).bak $(SERVICE_NAME)）"; fi; \
+		echo "⚠️  服务由你自行管理，请手动重启 gosee 进程"; \
+		echo "   健康检查：curl $(HEALTH_URL)"'
 
 # ===== 帮助 =====
 help:
@@ -107,4 +96,4 @@ help:
 	@echo "  make tidy       go mod tidy"
 	@echo "  make build-linux 交叉编译 Linux amd64 单二进制（部署到 Linux 服务器）"
 	@echo "  make deploy     构建部署产物"
-	@echo "  make publish    一条龙发布到生产并重启、检查 gosee 服务"
+	@echo "  make publish    构建并上传二进制到生产（备份旧版，手动重启）"
