@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { menuOptions } from './menu'
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
+import { APP_BUILD_TIME, APP_VERSION } from '@/constants/version'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,8 +37,14 @@ function onUserMenu(key: string) {
 <template>
   <n-layout has-sider style="height: 100vh">
     <n-layout-sider bordered :width="220" collapse-mode="width">
-      <div class="logo">gosee 监控</div>
-      <n-menu :options="menuOptions" :value="activeKey" :indent="18" @update:value="onSelect" />
+      <div class="sider-content">
+        <div class="logo">gosee 监控</div>
+        <n-menu class="sider-menu" :options="menuOptions" :value="activeKey" :indent="18" @update:value="onSelect" />
+        <div class="build-version" :title="`完整构建时间：${APP_BUILD_TIME}`">
+          <span class="build-version-label">版本</span>
+          <span class="build-version-value">{{ APP_VERSION }}</span>
+        </div>
+      </div>
     </n-layout-sider>
     <n-layout>
       <n-layout-header bordered class="flex items-center justify-between px-6" style="height: 56px">
@@ -55,6 +62,12 @@ function onUserMenu(key: string) {
 </template>
 
 <style scoped>
+.sider-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .logo {
   height: 56px;
   line-height: 56px;
@@ -63,5 +76,31 @@ function onUserMenu(key: string) {
   font-weight: 600;
   color: #18a058;
   border-bottom: 1px solid #efeff5;
+}
+
+.sider-menu {
+  flex: 1;
+  min-height: 0;
+}
+
+.build-version {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid #efeff5;
+  color: #8c8c92;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.build-version-label {
+  color: #a4a4aa;
+}
+
+.build-version-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 </style>

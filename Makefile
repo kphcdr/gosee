@@ -5,6 +5,7 @@ SSH_TARGET ?= root@47.111.129.138
 REMOTE_DIR ?= /data/www/sites/gosee
 SERVICE_NAME ?= gosee
 HEALTH_URL ?= http://127.0.0.1:8080/health
+VERSION ?= v$(shell date '+%Y.%m.%d-%H%M')
 
 # ===== 构建 =====
 
@@ -13,7 +14,7 @@ all: frontend backend
 
 # 构建前端（输出 web/dist）
 frontend:
-	cd web && pnpm install && pnpm build
+	cd web && pnpm install && VITE_APP_VERSION=$(VERSION) pnpm build
 
 # 构建后端二进制（自动 embed web/dist）
 backend:
@@ -95,5 +96,6 @@ help:
 	@echo "  make clean      清理构建产物"
 	@echo "  make tidy       go mod tidy"
 	@echo "  make build-linux 交叉编译 Linux amd64 单二进制（部署到 Linux 服务器）"
+	@echo "                    可用 VERSION=vYYYY.MM.DD-HHmm 覆盖自动版本号"
 	@echo "  make deploy     构建部署产物"
 	@echo "  make publish    构建并上传二进制到生产（备份旧版，手动重启）"

@@ -4,8 +4,30 @@ import vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 
+function pad(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function formatBuildInfo(now: Date) {
+  const date = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}`
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}`
+  const offsetMinutes = -now.getTimezoneOffset()
+  const offsetSign = offsetMinutes >= 0 ? '+' : '-'
+  const offset = `${offsetSign}${pad(Math.floor(Math.abs(offsetMinutes) / 60))}:${pad(Math.abs(offsetMinutes) % 60)}`
+  return {
+    version: process.env.VITE_APP_VERSION?.trim() || `v${date}-${time}`,
+    buildTime: `${date.replaceAll('.', '-')} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} UTC${offset}`,
+  }
+}
+
+const buildInfo = formatBuildInfo(new Date())
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(buildInfo.version),
+    __APP_BUILD_TIME__: JSON.stringify(buildInfo.buildTime),
+  },
   plugins: [
     vue(),
     Components({
