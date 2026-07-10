@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"gosee/internal/api/middleware"
 	"gosee/internal/response"
 	"gosee/internal/service/alert"
 )
@@ -33,7 +34,7 @@ func (h *AlertEventHandler) Ack(c *gin.Context) {
 		response.Fail(c, "无效的 ID")
 		return
 	}
-	if err := h.svc.AckEvent(id); err != nil {
+	if err := h.svc.AckEvent(id, middleware.CurrentUserID(c)); err != nil {
 		response.Fail(c, "操作失败: "+err.Error())
 		return
 	}

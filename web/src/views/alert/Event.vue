@@ -24,7 +24,11 @@ async function load() {
   loading.value = true
   try {
     const all = await alertEventApi.list()
-    list.value = statusFilter.value ? all.filter((e) => e.status === statusFilter.value) : all
+    if (statusFilter.value === 'acked') {
+      list.value = all.filter((e) => e.acked_at !== null)
+    } else {
+      list.value = statusFilter.value ? all.filter((e) => e.status === statusFilter.value) : all
+    }
   } finally {
     loading.value = false
   }
@@ -34,14 +38,16 @@ usePolling(load, 30_000)
 
 type TagType = 'default' | 'info' | 'success' | 'warning' | 'error'
 
-function statusMeta(status: string): { label: string; type: TagType } {
+function statusMeta(event: AlertEvent): { label: string; type: TagType } {
+  if (event.status === 'firing' && event.acked_at) {
+    return { label: '告警中（已确认）', type: 'warning' }
+  }
   const map: Record<string, { label: string; type: TagType }> = {
     firing: { label: '告警中', type: 'error' },
-    acked: { label: '已确认', type: 'warning' },
     closed: { label: '已关闭', type: 'default' },
     recovered: { label: '已恢复', type: 'success' },
   }
-  return map[status] || { label: status, type: 'default' }
+  return map[event.status] || { label: event.status, type: 'default' }
 }
 
 async function doAck(row: AlertEvent) {
@@ -71,9 +77,9 @@ const columns: DataTableColumns<AlertEvent> = [
   {
     title: '状态',
     key: 'status',
-    width: 90,
+    width: 150,
     render: (r) => {
-      const m = statusMeta(r.status)
+      const m = statusMeta(r)
       return h(NTag, { type: m.type, size: 'small', round: true, bordered: false }, { default: () => m.label })
     },
   },
@@ -88,10 +94,10 @@ const columns: DataTableColumns<AlertEvent> = [
       h(NSpace, { size: 'small' }, {
         default: (): VNode | VNode[] => {
           const btns: VNode[] = []
-          if (r.status === 'firing') {
+          if (r.status === 'firing' && !r.acked_at) {
             btns.push(h(NButton, { size: 'small', onClick: () => doAck(r) }, { default: () => '确认' }))
           }
-          if (r.status === 'firing' || r.status === 'acked') {
+          if (r.status === 'firing') {
             btns.push(
               h(NButton, { size: 'small', type: 'warning', onClick: () => doClose(r) }, { default: () => '关闭' }),
             )

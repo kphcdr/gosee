@@ -29,8 +29,10 @@ export interface AlertEvent {
   current_value: number
   threshold: number
   level: AlertLevel
-  status: 'firing' | 'recovered' | 'acked' | 'closed'
+  status: 'firing' | 'recovered' | 'closed'
   first_triggered_at: string
   last_triggered_at: string
   recovered_at: string | null
+  acked_at: string | null
+  acked_by: number | null
 }

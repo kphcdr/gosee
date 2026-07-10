@@ -1,11 +1,9 @@
 package alert
 
 import (
-	"errors"
 	"time"
 
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 
 	"gosee/internal/model"
 	"gosee/internal/repository"
@@ -91,12 +89,12 @@ func (s *Service) ListEvents(limit int) ([]repository.AlertEventView, error) {
 	return s.eventRepo.List(limit)
 }
 
-func (s *Service) AckEvent(id int64) error {
-	return s.eventRepo.UpdateStatus(id, model.EventStatusAcked)
+func (s *Service) AckEvent(id, userID int64) error {
+	return s.eventRepo.Acknowledge(id, userID)
 }
 
 func (s *Service) CloseEvent(id int64) error {
-	return s.eventRepo.UpdateStatus(id, model.EventStatusClosed)
+	return s.eventRepo.Close(id)
 }
 
 // ===== 评估器（collector 采集后调用）=====
@@ -150,7 +148,10 @@ func (s *Service) evaluateRule(server *model.Server, rule *model.AlertRule, metr
 		threshold = float64(metric.CPUCores) * 2
 	}
 	// 连续 N 次：读最近 N 条 metric，全部超阈值才触发
-	recent, _ := s.metricRepo.RecentN(server.ID, rule.DurationTimes)
+	recent, err := s.metricRepo.RecentN(server.ID, rule.DurationTimes)
+	if err != nil {
+		return
+	}
 	if compare(value, rule.Operator, threshold) && allExceed(recent, rule) {
 		s.fireEvent(server, rule, value, threshold)
 	} else {
@@ -159,24 +160,6 @@ func (s *Service) evaluateRule(server *model.Server, rule *model.AlertRule, metr
 }
 
 func (s *Service) fireEvent(server *model.Server, rule *model.AlertRule, value, threshold float64) {
-	existing, err := s.eventRepo.FindFiring(rule.ID, server.ID)
-	if err == nil && existing != nil {
-		v := value
-		if err := s.eventRepo.TouchFiring(existing.ID, &v); err == nil && utils.Logger != nil {
-			utils.Logger.Info("告警持续",
-				zap.String("server", server.Name),
-				zap.String("rule", rule.Name),
-				zap.Float64("value", value),
-			)
-		}
-		existing.CurrentValue = &v
-		existing.LastTriggeredAt = time.Now()
-		s.notifyFired(existing)
-		return
-	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return
-	}
 	v := value
 	th := threshold
 	now := time.Now()
@@ -191,16 +174,20 @@ func (s *Service) fireEvent(server *model.Server, rule *model.AlertRule, value, 
 		FirstTriggeredAt: now,
 		LastTriggeredAt:  now,
 	}
-	if err := s.eventRepo.Create(ev); err == nil && utils.Logger != nil {
-		utils.Logger.Info("告警触发",
+	stored, err := s.eventRepo.UpsertFiring(ev)
+	if err != nil {
+		return
+	}
+	if utils.Logger != nil {
+		utils.Logger.Info("告警触发或持续",
 			zap.String("server", server.Name),
 			zap.String("rule", rule.Name),
 			zap.String("level", rule.Level),
 			zap.Float64("value", value),
 			zap.Float64("threshold", threshold),
 		)
-		s.notifyFired(ev)
 	}
+	s.notifyFired(stored)
 }
 
 func (s *Service) recoverEvent(server *model.Server, rule *model.AlertRule) {
@@ -208,11 +195,17 @@ func (s *Service) recoverEvent(server *model.Server, rule *model.AlertRule) {
 	if err != nil || existing == nil {
 		return
 	}
-	if err := s.eventRepo.MarkRecovered(existing.ID); err == nil && utils.Logger != nil {
-		utils.Logger.Info("告警恢复",
-			zap.String("server", server.Name),
-			zap.String("rule", rule.Name),
-		)
+	if err := s.eventRepo.MarkRecovered(existing.ID); err == nil {
+		now := time.Now()
+		existing.Status = model.EventStatusRecovered
+		existing.RecoveredAt = &now
+		existing.ActiveKey = nil
+		if utils.Logger != nil {
+			utils.Logger.Info("告警恢复",
+				zap.String("server", server.Name),
+				zap.String("rule", rule.Name),
+			)
+		}
 		s.notifyRecovered(existing)
 	}
 }
@@ -261,7 +254,11 @@ func compare(value float64, op string, threshold float64) bool {
 
 // allExceed 最近 N 条是否全部超阈值（含 load 动态阈值）
 func allExceed(recent []model.ServerMetric, rule *model.AlertRule) bool {
-	if len(recent) == 0 {
+	required := rule.DurationTimes
+	if required <= 0 {
+		required = 1
+	}
+	if len(recent) != required {
 		return false
 	}
 	for i := range recent {

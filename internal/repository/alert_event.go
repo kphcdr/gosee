@@ -1,9 +1,11 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"gosee/internal/model"
 )
@@ -60,11 +62,11 @@ func (r *AlertEventRepository) listByGroupSince(limit int, groupID *int64, since
 	return rows, err
 }
 
-// FindFiring 查某规则+服务器当前 firing 状态的事件（无则 ErrRecordNotFound）
+// FindFiring 查某规则+服务器当前活动事件（无则 ErrRecordNotFound）。
 func (r *AlertEventRepository) FindFiring(ruleID, serverID int64) (*model.AlertEvent, error) {
 	var ev model.AlertEvent
-	err := r.db.Where("alert_rule_id = ? AND server_id = ? AND status = ?",
-		ruleID, serverID, model.EventStatusFiring).First(&ev).Error
+	err := r.db.Where("active_key = ? AND status = ?",
+		model.ActiveAlertKey(ruleID, serverID), model.EventStatusFiring).First(&ev).Error
 	return &ev, err
 }
 
@@ -72,14 +74,35 @@ func (r *AlertEventRepository) Create(ev *model.AlertEvent) error {
 	return r.db.Create(ev).Error
 }
 
-// TouchFiring 更新已存在 firing 事件的最近触发时间与当前值
-func (r *AlertEventRepository) TouchFiring(id int64, currentValue *float64) error {
-	return r.db.Model(&model.AlertEvent{}).Where("id = ?", id).
-		Updates(map[string]interface{}{
-			"last_triggered_at": gorm.Expr("CURRENT_TIMESTAMP"),
-			"current_value":     currentValue,
+// UpsertFiring 原子创建或刷新活动告警。
+// active_key 的唯一索引保证并发评估同一服务器/规则时最多只有一条活动事件。
+func (r *AlertEventRepository) UpsertFiring(ev *model.AlertEvent) (*model.AlertEvent, error) {
+	key := model.ActiveAlertKey(ev.AlertRuleID, ev.ServerID)
+	ev.ActiveKey = &key
+	ev.Status = model.EventStatusFiring
+
+	err := r.db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "active_key"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"current_value":     ev.CurrentValue,
+			"threshold":         ev.Threshold,
+			"level":             ev.Level,
+			"metric":            ev.Metric,
 			"status":            model.EventStatusFiring,
-		}).Error
+			"last_triggered_at": ev.LastTriggeredAt,
+			"recovered_at":      nil,
+			"updated_at":        ev.LastTriggeredAt,
+		}),
+	}).Create(ev).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var stored model.AlertEvent
+	if err := r.db.Where("active_key = ?", key).First(&stored).Error; err != nil {
+		return nil, err
+	}
+	return &stored, nil
 }
 
 // MarkRecovered 标记恢复
@@ -88,12 +111,34 @@ func (r *AlertEventRepository) MarkRecovered(id int64) error {
 		Updates(map[string]interface{}{
 			"status":       model.EventStatusRecovered,
 			"recovered_at": gorm.Expr("CURRENT_TIMESTAMP"),
+			"active_key":   nil,
 		}).Error
 }
 
-// UpdateStatus 更新事件状态（ack / close）
-func (r *AlertEventRepository) UpdateStatus(id int64, status string) error {
-	return r.db.Model(&model.AlertEvent{}).Where("id = ?", id).Update("status", status).Error
+// Acknowledge 记录确认信息，但不改变告警生命周期状态。
+func (r *AlertEventRepository) Acknowledge(id, userID int64) error {
+	res := r.db.Model(&model.AlertEvent{}).
+		Where("id = ? AND status = ?", id, model.EventStatusFiring).
+		Updates(map[string]interface{}{
+			"acked_at": gorm.Expr("CURRENT_TIMESTAMP"),
+			"acked_by": userID,
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.New("仅活动告警可以确认")
+	}
+	return nil
+}
+
+// Close 主动关闭告警并释放活动唯一键；若指标继续超限，下次评估会创建新事件。
+func (r *AlertEventRepository) Close(id int64) error {
+	return r.db.Model(&model.AlertEvent{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"status":     model.EventStatusClosed,
+			"active_key": nil,
+		}).Error
 }
 
 // UpdateNotified 记录已通知（防重复，阶段六 Notifier 调用）

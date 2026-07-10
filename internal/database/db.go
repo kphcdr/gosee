@@ -63,6 +63,9 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	); err != nil {
 		return nil, fmt.Errorf("数据库迁移失败: %w", err)
 	}
+	if err := migrateAlertEventState(db); err != nil {
+		return nil, fmt.Errorf("告警事件状态迁移失败: %w", err)
+	}
 	if utils.Logger != nil {
 		utils.Logger.Info("数据库迁移完成", zap.String("driver", cfg.Driver))
 	}
